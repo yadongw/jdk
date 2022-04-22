@@ -388,8 +388,17 @@ public:
     emit_int32((jint)insn);
   }
 
-  void _halt() {
-    emit_int32(0);
+  // Emit an illegal instruction that's known to trap, with 32 possible csr
+  // indexes to choose from (from 0 to 31). A de facto implementation
+  // of this instruction is the UNIMP pseduo-instruction, 'CSRRW x0, cycle, x0',
+  // attempting to write zero to a read-only CSR 'cycle' (which is 0xC00).
+  // RISC-V ISAs provide a set of up to 32 read-only CSR registers 0xC00-0xC1F,
+  // and an attempt to write into any read-only CSR (whether it exists or not)
+  // will generate an illegal instruction exception.
+  void illegal_instruction(unsigned csr_index) {
+    assert(csr_index < 32, "invalid csr index to emit a illegal instruction");
+    unsigned csr = 0xc00 + (csr_index & 0x1f);
+    csrrw(x0, csr, x0);
   }
 
 // Register Instruction
@@ -2851,20 +2860,6 @@ public:
   }
 
   INSN(ebreak);
-
-#undef INSN
-
-#define INSN(NAME)                                                      \
-  void NAME() {                                                         \
-    /* The illegal instruction in RVC is presented by a 16-bit 0. */    \
-    if (do_compress()) {                                                \
-      emit_int16(0);                                                    \
-      return;                                                           \
-    }                                                                   \
-    _halt();                                                            \
-  }
-
-  INSN(halt);
 
 #undef INSN
 
