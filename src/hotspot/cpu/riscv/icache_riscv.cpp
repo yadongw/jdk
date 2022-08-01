@@ -34,6 +34,13 @@
 // on each hart. You can pass a flag to determine a global or local icache flush.
 static void icache_flush(long int start, long int end)
 {
+  // To make a store to instruction memory visible to all RISC-V
+  // harts, the writing hart has to execute a data FENCE before
+  // requesting that all remote RISC-V harts execute a FENCE.I.
+  // We cannot guarantee that the flush icache syscall follow the
+  // spec, so we leave a full data fence here.
+  __asm__ volatile ("fence rw, rw" ::: "memory");
+
   const int SYSCALL_RISCV_FLUSH_ICACHE = 259;
   register long int __a7 asm ("a7") = SYSCALL_RISCV_FLUSH_ICACHE;
   register long int __a0 asm ("a0") = start;
