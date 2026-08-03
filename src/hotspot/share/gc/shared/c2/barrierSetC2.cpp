@@ -314,11 +314,26 @@ public:
 
     bool is_volatile = (decorators & MO_SEQ_CST) != 0;
     bool is_acquire = (decorators & MO_ACQUIRE) != 0;
+    bool is_release = (decorators & MO_RELEASE) != 0;
+
+    // A standalone release store has no trailing ordering barrier.  Some
+    // backends still need a reliable way to associate the store with its
+    // leading MemBarRelease.  Use a trailing MemBarCPUOrder as a compiler-only
+    // marker and link the pair exactly like a volatile store pair.
+    bool track_release_store = is_write && !is_atomic && is_release && Matcher::supports_standalone_release_store();
+    Node* trailing_cpu_membar = nullptr;
 
     // If reference is volatile, prevent following volatiles ops from
     // floating up before the volatile access.
     if (_access.needs_cpu_membar()) {
-      kit->insert_mem_bar(Op_MemBarCPUOrder);
+      Node* precedent = track_release_store ? _access.raw_access() : nullptr;
+      trailing_cpu_membar = kit->insert_mem_bar(Op_MemBarCPUOrder, precedent);
+    } else if (track_release_store) {
+      assert(kit != nullptr, "unsupported at optimization time");
+      Node* n = _access.raw_access();
+      assert(n != nullptr && n->is_Store() && n->as_Store()->is_release(), "release store expected");
+      int alias_idx = kit->C->get_alias_index(_access.addr().type());
+      trailing_cpu_membar = kit->insert_mem_bar_volatile(Op_MemBarCPUOrder, alias_idx, n);
     }
 
     if (is_atomic) {
@@ -339,6 +354,9 @@ public:
         if (_leading_membar != nullptr) {
           MemBarNode::set_store_pair(_leading_membar->as_MemBar(), mb->as_MemBar());
         }
+      } else if (track_release_store) {
+        assert(_leading_membar != nullptr && trailing_cpu_membar != nullptr, "release store membar pair expected");
+        MemBarNode::set_store_pair(_leading_membar->as_MemBar(), trailing_cpu_membar->as_MemBar());
       }
     } else {
       if (is_volatile || is_acquire) {

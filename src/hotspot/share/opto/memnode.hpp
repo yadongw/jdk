@@ -1190,7 +1190,8 @@ class MemBarNode: public MultiNode {
   // Memory type this node is serializing.  Usually either rawptr or bottom.
   const TypePtr* _adr_type;
 
-  // How is this membar related to a nearby memory access?
+  // How is this membar related to a nearby memory access?  A store pair can
+  // end in a MemBarVolatile or in a compiler-only MemBarCPUOrder marker.
   enum {
     Standalone,
     TrailingLoad,
