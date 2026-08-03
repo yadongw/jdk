@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, 2025, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2026, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2021, 2022, Huawei Technologies Co., Ltd. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
@@ -123,6 +123,10 @@
   // the whole long is written but de-opt'ing will have to extract
   // the relevant 32 bits.
   static const bool int_in_long = true;
+
+  static constexpr bool supports_standalone_release_store() {
+    return false;
+  }
 
   // Does the CPU supports vector variable shift instructions?
   static bool supports_vector_variable_shifts(void) {

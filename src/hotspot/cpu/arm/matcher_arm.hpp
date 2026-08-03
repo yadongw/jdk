@@ -117,6 +117,10 @@
   static const bool int_in_long = false;
 #endif
 
+  static constexpr bool supports_standalone_release_store() {
+    return false;
+  }
+
   // Does the CPU supports vector variable shift instructions?
   static bool supports_vector_variable_shifts(void) {
     return VM_Version::has_simd();

@@ -125,6 +125,10 @@
   // the relevant 32 bits.
   static const bool int_in_long = true;
 
+  static constexpr bool supports_standalone_release_store() {
+    return false;
+  }
+
   // Does the CPU supports vector variable shift instructions?
   static constexpr bool supports_vector_variable_shifts(void) {
     return false;

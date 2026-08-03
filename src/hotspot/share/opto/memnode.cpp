@@ -3974,7 +3974,7 @@ MemBarNode* StoreNode::trailing_membar() const {
       Node* u = fast_out(i);
       if (u->is_MemBar()) {
         if (u->as_MemBar()->trailing_store()) {
-          assert(u->Opcode() == Op_MemBarVolatile, "");
+          assert(u->Opcode() == Op_MemBarVolatile || u->Opcode() == Op_MemBarCPUOrder, "unexpected trailing store membar");
           assert(trailing_mb == nullptr, "only one");
           trailing_mb = u->as_MemBar();
 #ifdef ASSERT

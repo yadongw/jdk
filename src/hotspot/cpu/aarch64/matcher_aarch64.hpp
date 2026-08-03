@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, 2025, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2026, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -124,6 +124,12 @@
   // the whole long is written but de-opt'ing will have to extract
   // the relevant 32 bits.
   static const bool int_in_long = true;
+
+  // Does the target optimize a standalone release store using a trailing
+  // compiler-only membar marker?
+  static bool supports_standalone_release_store() {
+    return UseStlrForStandaloneRelease;
+  }
 
   // Does the CPU supports vector variable shift instructions?
   static constexpr bool supports_vector_variable_shifts(void) {
