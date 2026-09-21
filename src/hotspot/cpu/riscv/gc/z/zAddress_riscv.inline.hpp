@@ -28,7 +28,7 @@
 #include "utilities/globalDefinitions.hpp"
 
 inline uintptr_t ZPointer::remap_bits(uintptr_t colored) {
-  return colored & ZPointerRemappedMask;
+  return (colored ^ ZPointerRemappedMask) & ZPointerRemappedMask;
 }
 
 inline constexpr int ZPointer::load_shift_lookup(uintptr_t value) {

@@ -50,6 +50,14 @@ static void z_uncolor(MacroAssembler* masm, Register ref) {
 static void check_color(MacroAssembler* masm, Register ref, bool on_non_strong, Register result) {
   int format = on_non_strong ? ZBarrierRelocationFormatMarkBadMask
                              : ZBarrierRelocationFormatLoadBadMask;
+  if (!on_non_strong && UseZbs) {
+    // The load bad mask is a single bit; bexti extracts it and the GC
+    // patches the shamt field when the remapped bit changes.
+    __ relocate(barrier_Relocation::spec(), [&] {
+      __ bexti(result, ref, barrier_Relocation::unpatched);
+    }, format);
+    return;
+  }
   __ relocate(barrier_Relocation::spec(), [&] {
     __ li16u(result, barrier_Relocation::unpatched);
   }, format);

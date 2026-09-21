@@ -38,6 +38,7 @@
 #include "runtime/sharedRuntime.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/macros.hpp"
+#include "utilities/powerOfTwo.hpp"
 #ifdef COMPILER1
 #include "c1/c1_LIRAssembler.hpp"
 #include "c1/c1_MacroAssembler.hpp"
@@ -650,6 +651,13 @@ void ZBarrierSetAssembler::patch_barrier_relocation(address addr, int format) {
   int bytes;
   switch (format) {
     case ZBarrierRelocationFormatLoadBadMask:
+      if (MacroAssembler::is_bexti_at(addr)) {
+        // The load bad mask is a single bit; patch its position into the shamt field
+        Assembler::patch(addr, 25, 20, exact_log2((uintptr_t)value));
+        bytes = MacroAssembler::instruction_size;
+        break;
+      }
+      // fall through
     case ZBarrierRelocationFormatMarkBadMask:
     case ZBarrierRelocationFormatStoreGoodBits:
     case ZBarrierRelocationFormatStoreBadMask:
@@ -822,7 +830,14 @@ static void check_color(LIR_Assembler* ce, LIR_Opr ref, bool on_non_strong) {
   assert_different_registers(t0, xthread, ref->as_register());
   int format = on_non_strong ? ZBarrierRelocationFormatMarkBadMask
                              : ZBarrierRelocationFormatLoadBadMask;
-  Label good;
+  if (!on_non_strong && UseZbs) {
+    // The load bad mask is a single bit; bexti extracts it and the GC
+    // patches the shamt field when the remapped bit changes.
+    __ relocate(barrier_Relocation::spec(), [&] {
+      __ bexti(t0, ref->as_register(), barrier_Relocation::unpatched);
+    }, format);
+    return;
+  }
   __ relocate(barrier_Relocation::spec(), [&] {
     __ li16u(t0, barrier_Relocation::unpatched);
   }, format);
