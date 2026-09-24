@@ -651,9 +651,19 @@ void ZBarrierSetAssembler::patch_barrier_relocation(address addr, int format) {
   int bytes;
   switch (format) {
     case ZBarrierRelocationFormatLoadBadMask:
+      // The load bad mask is a single bit; the shamt computations below
+      // depend on it.
+      assert(is_power_of_2((uintptr_t)value), "load bad mask must be a single bit");
       if (MacroAssembler::is_bexti_at(addr)) {
-        // The load bad mask is a single bit; patch its position into the shamt field
+        // Patch the bad bit's position into the shamt field
         Assembler::patch(addr, 25, 20, exact_log2((uintptr_t)value));
+        bytes = MacroAssembler::instruction_size;
+        break;
+      }
+      if (MacroAssembler::is_slli_at(addr)) {
+        // Same single-bit test, expressed as a shift of the bad bit into
+        // the sign bit (bit 63 on RV64); patch the shift amount accordingly
+        Assembler::patch(addr, 25, 20, 63 - exact_log2((uintptr_t)value));
         bytes = MacroAssembler::instruction_size;
         break;
       }
@@ -826,7 +836,7 @@ static void z_uncolor(LIR_Assembler* ce, LIR_Opr ref) {
   __ srli(ref->as_register(), ref->as_register(), ZPointerLoadShift);
 }
 
-static void check_color(LIR_Assembler* ce, LIR_Opr ref, bool on_non_strong) {
+static void check_color(LIR_Assembler* ce, LIR_Opr ref, bool on_non_strong, Label& good) {
   assert_different_registers(t0, xthread, ref->as_register());
   int format = on_non_strong ? ZBarrierRelocationFormatMarkBadMask
                              : ZBarrierRelocationFormatLoadBadMask;
@@ -836,12 +846,26 @@ static void check_color(LIR_Assembler* ce, LIR_Opr ref, bool on_non_strong) {
     __ relocate(barrier_Relocation::spec(), [&] {
       __ bexti(t0, ref->as_register(), barrier_Relocation::unpatched);
     }, format);
+    __ beqz(t0, good);
+    return;
+  }
+  if (!on_non_strong) {
+    // The load bad mask is a single bit; shift it into the sign bit so the
+    // good check is a plain bgez, with no Zbs required. The GC patches the
+    // shamt field when the remapped bit changes. The raw _slli form must be
+    // used: for the zero unpatched shamt the slli wrapper emits a register
+    // move instead of an slli, leaving no shamt field for the patcher.
+    __ relocate(barrier_Relocation::spec(), [&] {
+      __ _slli(t0, ref->as_register(), barrier_Relocation::unpatched);
+    }, format);
+    __ bgez(t0, good);
     return;
   }
   __ relocate(barrier_Relocation::spec(), [&] {
     __ li16u(t0, barrier_Relocation::unpatched);
   }, format);
   __ andr(t0, ref->as_register(), t0);
+  __ beqz(t0, good);
 }
 
 void ZBarrierSetAssembler::generate_c1_color(LIR_Assembler* ce, LIR_Opr ref) const {
@@ -857,8 +881,7 @@ void ZBarrierSetAssembler::generate_c1_load_barrier(LIR_Assembler* ce,
                                                     ZLoadBarrierStubC1* stub,
                                                     bool on_non_strong) const {
   Label good;
-  check_color(ce, ref, on_non_strong);
-  __ beqz(t0, good);
+  check_color(ce, ref, on_non_strong, good);
   __ j(*stub->entry());
 
   __ bind(good);

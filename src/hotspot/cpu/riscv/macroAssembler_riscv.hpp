@@ -1755,6 +1755,13 @@ public:
            Assembler::extract(((unsigned*)instr)[0], 31, 26) == 0b010010;
   }
 
+  static bool is_slli_at(address instr) {
+    assert_cond(instr != nullptr);
+    return extract_opcode(instr) == 0b0010011 &&
+           extract_funct3(instr) == 0b001 &&
+           Assembler::extract(((unsigned*)instr)[0], 31, 26) == 0b000000;
+  }
+
   static bool is_slli_shift_at(address instr, uint32_t shift) {
     assert_cond(instr != nullptr);
     return (extract_opcode(instr) == 0b0010011 && // opcode field
